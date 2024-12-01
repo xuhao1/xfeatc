@@ -43,7 +43,7 @@ XFeat::XFeat(const std::string &modelFile) {
     ortEnv_ = std::unique_ptr<Ort::Env>(new Ort::Env(ORT_LOGGING_LEVEL_WARNING, "XFeat"));
 
     Ort::SessionOptions sessionOptions;
-    sessionOptions.SetIntraOpNumThreads(1);
+    sessionOptions.SetIntraOpNumThreads(2);
     sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_BASIC);
 
     ortSession_ = std::unique_ptr<Ort::Session>(new Ort::Session(*ortEnv_, modelFileOrt.data(), sessionOptions));
@@ -107,6 +107,7 @@ void XFeat::DetectAndCompute(const cv::Mat &img, std::vector<cv::KeyPoint> &keys
     fimg -= mean;
     fimg /= std;
 
+    timer.Reset();
     std::vector<Ort::Value> inputTensors;
     inputTensors.emplace_back(OnnxHelper::CreateTensor<float>(inputInfos_[0].shape, fimg.ptr<float>(), W_ * H_, true));
 
@@ -121,6 +122,7 @@ void XFeat::DetectAndCompute(const cv::Mat &img, std::vector<cv::KeyPoint> &keys
     // get the keypoint scores, it's a [1, H/8, W/8, 65] tensor,
     auto* kptScorePtr = outputTensors[1].GetTensorMutableData<float>();
     const int shw = Hd8_ * Wd8_;
+    double ort_time = timer.Elapse();
 
     timer.Reset();
     // we shall apply softmax along the 65 channels to get the scores
@@ -216,10 +218,11 @@ void XFeat::DetectAndCompute(const cv::Mat &img, std::vector<cv::KeyPoint> &keys
     }
     double interp_time = timer.Elapse();
 
+    std::cout << "ort_time=" << ort_time;
     std::cout << ", score_softmax_time=" << score_softmax_time << ", score_flatten_time=" << score_flatten_time << ", nms_time=" << nms_time << std::endl;
     std::cout << "heatmap_resize_time=" << heatMap_resize_time << ", heatmap_mul_time=" << heatMap_mul_time << ", sort_time=" << sort_time << std::endl;
     std::cout << ", desc_norm_time=" << desc_norm_time << ", interp_time=" << interp_time << std::endl;
-    std::cout << "total_time=" << (score_softmax_time +score_flatten_time + nms_time + heatMap_resize_time + heatMap_mul_time + sort_time + desc_norm_time + interp_time) << std::endl;
+    std::cout << "total_time=" << (ort_time+score_softmax_time +score_flatten_time + nms_time + heatMap_resize_time + heatMap_mul_time + sort_time + desc_norm_time + interp_time) << std::endl;
 
     // add the edge
     for (auto &key : keys) {

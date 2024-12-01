@@ -2,12 +2,12 @@
 #include <opencv2/opencv.hpp>
 #include "OnnxHelper.h"
 #include "XFeat.h"
-
+#include "Timer.h"
 
 int main(int argc, char** argv) {
     // parse arguments
     const std::string argKeys =
-            "{model | ../model/xfeat_640x640.onnx | model file path}"
+            "{model | ../model/xfeat_640x640.quant.onnx | model file path}"
             "{img | ../data/1.png | image file path}";
     cv::CommandLineParser parser(argc, argv, argKeys);
     auto modelFile = parser.get<std::string>("model");
@@ -26,8 +26,11 @@ int main(int argc, char** argv) {
     // detect xfeat corners and compute descriptors
     std::vector<cv::KeyPoint> keys;
     cv::Mat descs;
-    xfeat.DetectAndCompute(img, keys, descs, 1000);
-
+    Timer timer;
+    for (int i = 0; i < 100; i++)
+    {
+        xfeat.DetectAndCompute(img, keys, descs, 200);
+    }
     // draw keypoints
     cv::Mat imgColor;
     cv::cvtColor(img, imgColor, cv::COLOR_GRAY2BGR);
